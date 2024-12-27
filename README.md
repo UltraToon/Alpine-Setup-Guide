@@ -1,11 +1,7 @@
-> Temp Notes
-Alpine Linux Setup  
 Gaming KVM  
 DWL  
 Distrobox setup [flatpak too]  
-Custom Kernel  
-XFS/BTRFS file system  
-ZRAM  
+Custom Kernel
 Zellij with foot/ghostty  
 EFIBOOTMGR
 **BTRFS has asychronous discard (trim) default on kernel 6.2, use FITRIM periodic with chrontab for XFS SSD**
@@ -27,3 +23,6 @@ https://wiki.alpinelinux.org/wiki/Zram
 
 > FSTAB Options
 `defaults,noatime,compress=zstd`
+
+# Post Install
+1. Setup zram: https://wiki.alpinelinux.org/wiki/Zram  
