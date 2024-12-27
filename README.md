@@ -22,8 +22,9 @@ https://wiki.alpinelinux.org/wiki/Zram
 5. Create a `/kvm` directory and mount the 1tb SSD, `mount /dev/XXX /kvm`
 6. `blkid >> /etc/fstab` then edit correspondingly
 
-> FSTAB Options
-`defaults,noatime,compress=zstd`
+> Mount / FSTAB Options
+`defaults,noatime,compress=zstd,space_cache=v2`
+Dont use space cache for the XFS ssd.
 
 # Post Install
 1. Setup zram: https://wiki.alpinelinux.org/wiki/Zram  
