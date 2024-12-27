@@ -1,13 +1,13 @@
 > Temp Notes
-Alpine Linux Setup
-Gaming KVM
-DWL
-Distrobox setup [flatpak too]
-Custom Kernel
-XFS/BTRFS file system [to replace LVM, LVM annoying! LVm Not Good. Jew.]
-ZRAM
-Zellij with foot/ghostty
-EFIBOOTMGR
+Alpine Linux Setup 
+Gaming KVM 
+DWL 
+Distrobox setup [flatpak too] 
+Custom Kernel 
+XFS/BTRFS file system 
+ZRAM 
+Zellij with foot/ghostty 
+EFIBOOTMGR 
 
 *use GPT partitioning tools like gdisk., etc)
 https://gist.github.com/QaidVoid/d83fa164e3534b816288d53ef3262c88
