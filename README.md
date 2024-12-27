@@ -7,7 +7,8 @@ Custom Kernel
 XFS/BTRFS file system  
 ZRAM  
 Zellij with foot/ghostty  
-EFIBOOTMGR  
+EFIBOOTMGR
+Trim with chrony?
 
 *use GPT partitioning tools like gdisk., etc)
 https://gist.github.com/QaidVoid/d83fa164e3534b816288d53ef3262c88
