@@ -12,7 +12,7 @@ https://wiki.alpinelinux.org/wiki/Installation
 https://wiki.alpinelinux.org/wiki/Zram  
 
 # Install Process
-1. Run through setup alpine, and then ^C the disk prompt.
+1. Run `setup-alpine`, when prompted for disk configuration, press **^C**.
 2. `export ROOTFS=btrfs BOOTFS=vfat BOOTLOADER=grub && setup-disk -s 0 -v -m sys` Choose 512gb ssd
 
 ## Setting up secondary SSD for KVM.  
