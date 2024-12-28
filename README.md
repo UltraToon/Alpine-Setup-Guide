@@ -16,6 +16,7 @@ https://wiki.alpinelinux.org/wiki/Zram
 2. `export ROOTFS=btrfs BOOTFS=vfat BOOTLOADER=grub DISKLABEL=gpt && setup-disk -s 0 -v -m sys` **512GB SSD**
 3. `BTRFS_OPTS="defaults,noatime,compress=zstd,space_cache=v2"`
 4. `mount -o $BTRFS_OPTS /dev/XXX /mnt` **512GB SSD**
+5. apk add dos2unix
 ```
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
