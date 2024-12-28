@@ -21,7 +21,9 @@ btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
 btrfs subvolume create /mnt/@var_log
 btrfs subvolume create /mnt/@snapshots
+umount /mnt
 ```
+5. 
 
 ## Setting up secondary SSD for KVM.  
 3. `apk add xfsprogs cfdisk`
