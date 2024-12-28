@@ -1,19 +1,22 @@
 #!/bin/sh
 set -e
 clear
-GREEN="\033[1;32m"
-RESET="\033[0m"
 MOUNTPOINT="/mnt"
 BTRFS_OPTS="defaults,ssd,noatime,space_cache=v2"
 
-echo "${GREEN}Enter the disk to use (e.g., /dev/XXX):${RESET}"
+echo "[> Setting up... <]"
+apk add -q parted btrfs-progs
+
+echo "=========================="
+lsblk -nrpo NAME,FSTYPE | awk '$2 == "" {print $1}'
+echo "=========================="
+echo "Enter the disk to use (e.g., /dev/XXX):"
 read -r DISK
 
 #compress=zstd also need to install zstd pkg
 
 #ROOTFS=btrfs BOOTFS=vfat BOOTLOADER=grub DISKLABEL=gpt DISKDEV=$DISK && #setup-disk -s 0 -m sys /mnt
 
-apk add -q parted btrfs-progs lsblk
 parted --script -a optimal "$DISK" \
     mklabel gpt \
     mkpart primary fat32 0% 200M \
@@ -22,18 +25,20 @@ parted --script -a optimal "$DISK" \
     mkpart primary btrfs 200M 100% \
     name 2 root
 
-ESP_PAR=$(lsblk -nrpo NAME,FSTYPE "$DISK" | awk '$2 == "vfat" {print $1}')
-BTRFS_PAR=$(lsblk -nrpo NAME,FSTYPE "$DISK" | awk '$2 == "btrfs" {print $1}')
+
+PART_SUFFIX=$(case "$DISK" in /dev/nvme*) echo p ;; esac)
+ESP_PAR="${DISK}${PART_SUFFIX}1"
+BTRFS_PAR="${DISK}${PART_SUFFIX}2"
 
 # BTRFS SECTION
 modprobe btrfs
 mkfs.btrfs -f -q "$BTRFS_PAR"
 
-echo "Mounting $BTRFS_PAR to $MOUNTPOINT for subvolume creation"
+echo "[> Mounting $BTRFS_PAR to $MOUNTPOINT for subvolume creation <]"
 mount -t btrfs "$BTRFS_PAR" "$MOUNTPOINT"
 SUBVOLUMES="@ @home @var_log @snapshots"
 for subvol in $SUBVOLUMES; do
-    echo "${GREEN}Creating subvolume: [ $subvol ]${RESET}"
+    echo "[> Creating subvolume: $subvol <]"
     btrfs subvolume create "$MOUNTPOINT/$subvol"
 done
 umount "$MOUNTPOINT"
