@@ -15,7 +15,7 @@ https://wiki.alpinelinux.org/wiki/Zram
 1. Run `setup-alpine`
    - When prompted for APK repo, make sure to **enable community repos** then **find fastest mirror** (C+F)
    - When prompted for disk configuration, press **^C**.
-6. Run `wget https://raw.githubusercontent.com/UltraToon/Alpine-Setup-Guide/refs/heads/main/alpine-script.sh && chmod +x alpine-script.sh`
+6. Run `wget https://raw.githubusercontent.com/UltraToon/Alpine-Setup-Guide/refs/heads/main/alpine_script.sh && chmod +x alpine-script.sh`
 
 ## Setting up secondary SSD for KVM.  
 3. `apk add xfsprogs cfdisk`
