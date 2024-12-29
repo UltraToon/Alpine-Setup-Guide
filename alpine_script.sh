@@ -1,9 +1,15 @@
 #!/bin/sh
 set -e
+
+echo "WARNING: Did you ^C out of the disk prompt in setup-alpine? If not, please reboot the medium. (yes/no)"
+read -r response
+[ "$response" = "yes" ] || exit
+
 MOUNTPOINT="/mnt"
 BTRFS_OPTS="rw,noatime,ssd,compress=zstd,space_cache=v2"
+SUBVOLUMES="@ @home @var_log @snapshots" # Make directory creation follow this flexibly.
 
-echo ">>> Setting up..."
+echo ">>> [Phase 1] Setting up..."
 sed -i 's|alpine/[^/]\+|alpine/edge|g' "/etc/apk/repositories"
 apk update -q
 apk add -q parted btrfs-progs dosfstools zstd
@@ -20,18 +26,11 @@ read -r DISK
 # Partitioning
 parted --script -a optimal "$DISK" \
     mklabel gpt \
-    mkpart primary fat32 1MiB 513MiB \
+    mkpart primary fat32 0% 200MiB \
     name 1 esp \
     set 1 esp on \
-    mkpart primary btrfs 513MiB 100% \
+    mkpart primary btrfs 200MiB 100% \
     name 2 root
-#    mklabel gpt \
-#    mkpart primary fat32 0% 512M \
-#    name 1 esp \
-#    set 1 esp on \
-#    mkpart primary btrfs 512M 100% \
-#    name 2 root
-
 
 partprobe "$DISK"
 
@@ -48,12 +47,12 @@ mkfs.btrfs -f -q "$BTRFS_PAR"
 # Subvolumes and Mounting
 echo ">>> Creating snapper-style subvolume layouts"
 mount -t btrfs "$BTRFS_PAR" "$MOUNTPOINT"
-SUBVOLUMES="@ @home @var_log @snapshots"
 for subvol in $SUBVOLUMES; do
     btrfs subvolume create "$MOUNTPOINT/$subvol"
 done
-btrfs subvolume set-default /mnt/@
+btrfs subvolume set-default $MOUNTPOINT/@
 umount "$MOUNTPOINT"
+
 echo ">>> Unmounted $MOUNTPOINT and preparing subvolume mounts"
 mount -o subvol=@,$BTRFS_OPTS "$BTRFS_PAR" "$MOUNTPOINT"
 mkdir -p "$MOUNTPOINT/home" "$MOUNTPOINT/var/log" "$MOUNTPOINT/.snapshots" "$MOUNTPOINT/boot"
@@ -64,8 +63,54 @@ mount "$ESP_PAR" -t vfat  /mnt/boot
 
 BOOTLOADER=none setup-disk -k edge -m sys /mnt
 
+echo "============================================================"
+echo ">>> [Phase 2] System installed, chrooting for further setup."
+echo "============================================================"
+
+chroot /mnt
+mount -t proc proc /proc
+mount -t devtmpfs dev /dev
+
+echo ">>> Setting up secure-boot UKI [Unified Kernel Image] and etc.,"
+apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
+
+cat >/etc/kernel-hooks.d/secureboot.conf <<EOF
+cmdline=/etc/kernel/cmdline
+signing_disabled=yes
+output_dir="/boot/EFI/Linux"
+output_name="alpine-linux-{flavor}.efi"
+EOF
+
+cat >/etc/kernel/cmdline <<EOF
+root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2)
+rootflags=subvol=@
+rootfstype=btrfs
+modules=sd-mod,btrfs,nvme
+quiet
+ro
+EOF
+
+echo ">>> Updating hooks and initramfs"
+apk fix kernel-hooks
+sed -i 's/features="\(.*\)"/features="\1 kms"/' /etc/mkinitfs/mkinitfs.conf
+echo 'disable_trigger=yes' >> /etc/mkinitfs/mkinitfs.conf
+
+echo ">>> Creating boot entry"
+efibootmgr --disk "$DISK" --part 1 --create --label 'Alpine Linux' --load /EFI/Linux/alpine-linux-edge.efi --verbose
+
+echo ">>> Setting up zram"
+rc-update add zram-init
+cat >/etc/conf.d/zram-init <<EOF
+load_on_start=yes
+unload_on_stop=yes
+num_devices=1
+type0=swap
+size0=8192
+maxs0=1 # maximum number of parallel processes for this device
+algo0=lzo-rle # zstd (since linux-4.18), lz4 (since linux-3.15), or lzo.
+labl0=zram_swap # the label name
+EOF
+
+exit # EXIT CHROOT
 clear
 echo ">>> Script completed, please reboot."
-
-## setup fstab
-## add chroot steps for zram, microcode, and basics
