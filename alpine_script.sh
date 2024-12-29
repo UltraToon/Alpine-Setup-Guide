@@ -68,12 +68,9 @@ echo "============================================================"
 echo ">>> [Phase 2] System installed, chrooting for further setup."
 echo "============================================================"
 
-# Prepare chroot mounts
+chroot $MOUNTPOINT /bin/sh << EOF
 mount -t proc proc /proc
 mount -t devtmpfs dev /dev
-
-# Passing variables and running chroot.
-chroot $MOUNTPOINT /bin/sh << EOF
 echo ">>> Setting up secure-boot UKI [Unified Kernel Image] and etc.,"
 apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
 
