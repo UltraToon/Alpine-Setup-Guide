@@ -4,11 +4,12 @@ clear
 MOUNTPOINT="/mnt"
 BTRFS_OPTS="defaults,ssd,noatime,space_cache=v2"
 
-echo "[> Setting up... <]"
+echo "Setting up..."
 apk add -q parted btrfs-progs
+clear
 
 echo "=========================="
-lsblk -nrpo NAME,FSTYPE | awk '$2 == "" {print $1}'
+fdisk -l 2>/dev/null | grep "Disk \/" | grep -v "\/dev\/md" | awk '{print $2}' | sed -e 's/://g'
 echo "=========================="
 echo "Enter the disk to use (e.g., /dev/XXX):"
 read -r DISK
@@ -26,9 +27,9 @@ parted --script -a optimal "$DISK" \
     name 2 root
 
 
-PART_SUFFIX=$(case "$DISK" in /dev/nvme*) echo p ;; esac)
-ESP_PAR="${DISK}${PART_SUFFIX}1"
-BTRFS_PAR="${DISK}${PART_SUFFIX}2"
+NVME_SUFFIX=$(case "$DISK" in /dev/nvme*) echo p ;; esac)
+ESP_PAR="${DISK}${NVME_SUFFIX}1"
+BTRFS_PAR="${DISK}${NVME_SUFFIX}2"
 
 # BTRFS SECTION
 modprobe btrfs
@@ -38,7 +39,6 @@ echo "[> Mounting $BTRFS_PAR to $MOUNTPOINT for subvolume creation <]"
 mount -t btrfs "$BTRFS_PAR" "$MOUNTPOINT"
 SUBVOLUMES="@ @home @var_log @snapshots"
 for subvol in $SUBVOLUMES; do
-    echo "[> Creating subvolume: $subvol <]"
     btrfs subvolume create "$MOUNTPOINT/$subvol"
 done
 umount "$MOUNTPOINT"
