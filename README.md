@@ -12,12 +12,10 @@ https://wiki.alpinelinux.org/wiki/Installation
 https://wiki.alpinelinux.org/wiki/Zram  
 
 # Install Process
-1. Run `setup-alpine`, when prompted for disk configuration, press **^C**.
-2. `export ROOTFS=btrfs BOOTFS=vfat BOOTLOADER=grub DISKLABEL=gpt && setup-disk -s 0 -v -m sys` **512GB SSD**
-3. `BTRFS_OPTS="defaults,noatime,compress=zstd,space_cache=v2"`
-4. `mount -o $BTRFS_OPTS /dev/XXX /mnt` **512GB SSD**
-5. MAKE SURE IN SETUP GUIDE YOU ENABLE community repos and edge
-6. wget -O ./run.sh "link" && sed -i 's/\r//' run.sh
+1. Run `setup-alpine`
+   - When prompted for APK repo, make sure to **enable community repos** then **find fastest mirror** (C+F)
+   - When prompted for disk configuration, press **^C**.
+6. wget https://raw.githubusercontent.com/UltraToon/Alpine-Setup-Guide/refs/heads/main/alpine-script.sh && chmod +x alpine-script.sh
 ```
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
