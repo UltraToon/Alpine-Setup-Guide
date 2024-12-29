@@ -1,10 +1,11 @@
 Gaming KVM  
 DWL  
 Distrobox setup [flatpak too]  
-Custom Kernel
 Zellij with foot/ghostty  
-EFIBOOTMGR
+
 **BTRFS has asychronous discard (trim) default on kernel 6.2, use FITRIM periodic with chrontab for XFS SSD**
+
+ONLY SUPPORTS INTEL CPU SETUPS.
 
 https://gist.github.com/QaidVoid/d83fa164e3534b816288d53ef3262c88  
 https://it-notes.dragas.net/2021/11/03/alpine-linux-and-lxd-perfect-setup-part-1-btrfs-file-system/  
