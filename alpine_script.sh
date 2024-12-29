@@ -1,11 +1,13 @@
 #!/bin/sh
 set -e
 MOUNTPOINT="/mnt"
-BTRFS_OPTS="defaults,ssd,noatime,space_cache=v2"
-#compress=zstd also need to install zstd pkg
+BTRFS_OPTS="rw,noatime,ssd,compress=zstd,space_cache=v2"
+
 echo ">>> Setting up..."
-apk add -q parted btrfs-progs dosfstools
-umount /mnt 2>/dev/null || true
+sed -i 's|alpine/[^/]\+|alpine/edge|g' "/etc/apk/repositories"
+apk update -q
+apk add -q parted btrfs-progs dosfstools zstd
+umount "$MOUNTPOINT" 2>/dev/null || true
 modprobe btrfs
 clear
 
@@ -18,11 +20,18 @@ read -r DISK
 # Partitioning
 parted --script -a optimal "$DISK" \
     mklabel gpt \
-    mkpart primary fat32 0% 512M \
+    mkpart primary fat32 1MiB 513MiB \
     name 1 esp \
     set 1 esp on \
-    mkpart primary btrfs 512M 100% \
+    mkpart primary btrfs 513MiB 100% \
     name 2 root
+#    mklabel gpt \
+#    mkpart primary fat32 0% 512M \
+#    name 1 esp \
+#    set 1 esp on \
+#    mkpart primary btrfs 512M 100% \
+#    name 2 root
+
 
 partprobe "$DISK"
 
@@ -52,8 +61,6 @@ mount "$BTRFS_PAR" -o subvol=@home,$BTRFS_OPTS  "$MOUNTPOINT/home"
 mount "$BTRFS_PAR" -o subvol=@var_log,$BTRFS_OPTS "$MOUNTPOINT/var/log"
 mount "$BTRFS_PAR" -o subvol=@snapshots,$BTRFS_OPTS  "$MOUNTPOINT/.snapshots"
 mount "$ESP_PAR" -t vfat  /mnt/boot
-
-#ROOTFS=btrfs BOOTFS=vfat BOOTLOADER=grub DISKLABEL=gpt DISKDEV=$DISK && #setup-disk -s 0 -m sys /mnt
 
 BOOTLOADER=none setup-disk -k edge -m sys /mnt
 
