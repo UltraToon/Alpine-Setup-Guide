@@ -2,10 +2,11 @@
 set -e
 MOUNTPOINT="/mnt"
 BTRFS_OPTS="defaults,ssd,noatime,space_cache=v2"
-
+BOOTLOADER=grub
+#compress=zstd also need to install zstd pkg
 echo ">>> Setting up..."
 apk add -q parted btrfs-progs dosfstools
-umount /mnt
+umount /mnt 2>/dev/null || true
 modprobe btrfs
 clear
 
@@ -14,10 +15,6 @@ fdisk -l 2>/dev/null | grep "Disk \/" | grep -v "\/dev\/md" | awk '{print $2}' |
 echo "=========================="
 echo ">>> Enter the disk to use (e.g., /dev/XXX):"
 read -r DISK
-
-#compress=zstd also need to install zstd pkg
-
-#ROOTFS=btrfs BOOTFS=vfat BOOTLOADER=grub DISKLABEL=gpt DISKDEV=$DISK && #setup-disk -s 0 -m sys /mnt
 
 # Partitioning
 parted --script -a optimal "$DISK" \
@@ -36,8 +33,8 @@ ESP_PAR="${DISK}${NVME_SUFFIX}1"
 BTRFS_PAR="${DISK}${NVME_SUFFIX}2"
 
 # Filesystem Format
-mkfs.vfat -n BOOT -F 32 "$ESP_PAR"
-mkfs.btrfs -L alpine -f -q "$BTRFS_PAR"
+mkfs.vfat -F 32 "$ESP_PAR"
+mkfs.btrfs -f -q "$BTRFS_PAR"
 
 # EFI SECTION
 mkdir -p /mnt/boot
@@ -59,9 +56,12 @@ mount -o subvol=@home,$BTRFS_OPTS "$BTRFS_PAR" "$MOUNTPOINT/home"
 mount -o subvol=@var_log,$BTRFS_OPTS "$BTRFS_PAR" "$MOUNTPOINT/var/log"
 mount -o subvol=@snapshots,$BTRFS_OPTS "$BTRFS_PAR" "$MOUNTPOINT/.snapshots"
 
-DISKDEV=$DISK setup-disk -m sys /mnt
+ROOTFS=btrfs BOOTFS=vfat BOOTLOADER=grub DISKLABEL=gpt DISKDEV=$DISK && setup-disk -s 0 -m sys /mnt
 
-echo "${GREEN}Script completed, please reboot.${RESET}"
+setup-disk -m sys /mnt
+
+clear
+echo "${GREEN}>>> Script completed, please reboot. <<<${RESET}"
 
 ## setup fstab
 ## add chroot steps for zram, microcode, and basics
