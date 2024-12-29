@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "WARNING: Did you ^C out of the disk prompt in setup-alpine? If not, please reboot the medium. (yes/no)"
+echo "Did you ^C out of the disk prompt in setup-alpine? If not, please reboot the medium. (yes/no)"
 read -r response
 [ "$response" = "yes" ] || exit
 
@@ -45,7 +45,7 @@ mkfs.fat -F 32 "$ESP_PAR"
 mkfs.btrfs -f -q "$BTRFS_PAR"
 
 # Subvolumes and Mounting
-echo ">>> Creating snapper-style subvolume layouts"
+echo ">>> Creating snapper-style subvolume layout"
 mount -t btrfs "$BTRFS_PAR" "$MOUNTPOINT"
 for subvol in $SUBVOLUMES; do
     btrfs subvolume create "$MOUNTPOINT/$subvol"
@@ -63,32 +63,35 @@ mount "$ESP_PAR" -t vfat  /mnt/boot
 
 BOOTLOADER=none setup-disk -k edge -m sys /mnt
 
+clear
 echo "============================================================"
 echo ">>> [Phase 2] System installed, chrooting for further setup."
 echo "============================================================"
 
-chroot /mnt
+# Prepare chroot mounts
 mount -t proc proc /proc
 mount -t devtmpfs dev /dev
 
+# Passing variables and running chroot.
+chroot $MOUNTPOINT /bin/sh << EOF
 echo ">>> Setting up secure-boot UKI [Unified Kernel Image] and etc.,"
 apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
 
-cat >/etc/kernel-hooks.d/secureboot.conf <<EOF
+cat >/etc/kernel-hooks.d/secureboot.conf <<EOF1
 cmdline=/etc/kernel/cmdline
 signing_disabled=yes
 output_dir="/boot/EFI/Linux"
 output_name="alpine-linux-{flavor}.efi"
-EOF
+EOF1
 
-cat >/etc/kernel/cmdline <<EOF
+cat >/etc/kernel/cmdline <<EOF2
 root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2)
 rootflags=subvol=@
 rootfstype=btrfs
 modules=sd-mod,btrfs,nvme
 quiet
 ro
-EOF
+EOF2
 
 echo ">>> Updating hooks and initramfs"
 apk fix kernel-hooks
@@ -100,7 +103,7 @@ efibootmgr --disk "$DISK" --part 1 --create --label 'Alpine Linux' --load /EFI/L
 
 echo ">>> Setting up zram"
 rc-update add zram-init
-cat >/etc/conf.d/zram-init <<EOF
+cat >/etc/conf.d/zram-init <<EOF3
 load_on_start=yes
 unload_on_stop=yes
 num_devices=1
@@ -109,8 +112,8 @@ size0=8192
 maxs0=1 # maximum number of parallel processes for this device
 algo0=lzo-rle # zstd (since linux-4.18), lz4 (since linux-3.15), or lzo.
 labl0=zram_swap # the label name
+EOF3
 EOF
 
-exit # EXIT CHROOT
 clear
 echo ">>> Script completed, please reboot."
