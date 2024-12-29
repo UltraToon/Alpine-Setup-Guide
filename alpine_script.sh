@@ -68,14 +68,13 @@ BOOTLOADER=none setup-disk -k edge -m sys /mnt
 
 clear
 echo "============================================================"
-echo ">>> [Phase 2] System installed, chrooting for further setup."
+echo ">>> [Phase 2] System installed, setting up UKI and ZRAM..."
 echo "============================================================"
 
 chroot $MOUNTPOINT /bin/sh << EOF
 mount -t proc proc /proc
 mount -t devtmpfs dev /dev
-echo ">>> Setting up secure-boot UKI [Unified Kernel Image] and etc.,"
-apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
+apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init > /dev/null
 
 cat >/etc/kernel-hooks.d/secureboot.conf <<EOF1
 cmdline=/etc/kernel/cmdline
@@ -116,4 +115,6 @@ EOF3
 EOF
 
 clear
+echo "####################################"
 echo ">>> Script completed, please reboot."
+echo "####################################"
