@@ -58,7 +58,7 @@ mount "$ESP_PAR" -t vfat  /mnt/boot
 BOOTLOADER=none setup-disk -k edge -m sys /mnt
 
 clear
-echo "${GREEN}>>> Script completed, please reboot.${RESET}"
+echo ">>> Script completed, please reboot."
 
 ## setup fstab
 ## add chroot steps for zram, microcode, and basics
