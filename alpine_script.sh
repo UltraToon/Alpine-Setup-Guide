@@ -9,7 +9,10 @@ MOUNTPOINT="/mnt"
 BTRFS_OPTS="rw,noatime,ssd,compress=zstd,space_cache=v2"
 SUBVOLUMES="@ @home @var_log @snapshots" # Make directory creation follow this flexibly.
 
-echo ">>> [Phase 1] Setting up..."
+clear
+echo "================================================================="
+echo ">>> [Phase 1] Setting up partitions, btrfs, and system install..."
+echo "================================================================="
 sed -i 's|alpine/[^/]\+|alpine/edge|g' "/etc/apk/repositories"
 apk update -q
 apk add -q parted btrfs-progs dosfstools zstd
