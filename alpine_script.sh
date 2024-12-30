@@ -106,7 +106,6 @@ labl0=zram_swap # the label name
 EOF2
 EOF
 
-clear
 echo "####################################"
 echo ">>> Script completed, please reboot."
 echo "####################################"
