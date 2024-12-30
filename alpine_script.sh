@@ -76,23 +76,13 @@ mount -t proc proc /proc
 mount -t devtmpfs dev /dev
 apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
 
-# Declare cmdline before secureboot, so detection is correct.
 mkdir /etc/kernel
-cat >/etc/kernel/cmdline <<EOF1
-root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2)
-rootflags=subvol=@
-rootfstype=btrfs
-modules=sd-mod,btrfs,nvme
-quiet
-ro
-EOF1
-
-cat >/etc/kernel-hooks.d/secureboot.conf <<EOF2
-cmdline=/etc/kernel/cmdline
+cat >/etc/kernel-hooks.d/secureboot.conf <<EOF1
+cmdline="root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2) rootflags=subvol=@ rootfstype=btrfs modules=sd-mod,btrfs,nvme quiet ro"
 signing_disabled=yes
 output_dir="/boot/EFI/Linux"
 output_name="alpine-linux-{flavor}.efi"
-EOF2
+EOF1
 
 echo ">>> Updating hooks and initramfs"
 apk fix kernel-hooks
@@ -104,7 +94,7 @@ efibootmgr --disk "$DISK" --part 1 --create --label 'Alpine Linux' --load /EFI/L
 
 echo ">>> Setting up zram"
 rc-update add zram-init
-cat >/etc/conf.d/zram-init <<EOF3
+cat >/etc/conf.d/zram-init <<EOF2
 load_on_start=yes
 unload_on_stop=yes
 num_devices=1
@@ -113,7 +103,7 @@ size0=8192
 maxs0=1 # maximum number of parallel processes for this device
 algo0=lzo-rle # zstd (since linux-4.18), lz4 (since linux-3.15), or lzo.
 labl0=zram_swap # the label name
-EOF3
+EOF2
 EOF
 
 clear
