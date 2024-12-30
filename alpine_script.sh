@@ -77,7 +77,7 @@ mount -t proc proc /proc
 mount -t devtmpfs dev /dev
 
 # Run secureboot.conf setup before APK due to secureboot-hook running instantly.
-mkdir /etc/kernel
+mkdir -p /etc/kernel /etc/kernel-hooks.d
 cat >/etc/kernel-hooks.d/secureboot.conf <<EOF1
 cmdline="root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2) rootflags=subvol=@ rootfstype=btrfs modules=sd-mod,btrfs,nvme quiet ro"
 signing_disabled=yes
