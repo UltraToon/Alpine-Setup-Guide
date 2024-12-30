@@ -74,22 +74,24 @@ echo "============================================================"
 chroot $MOUNTPOINT /bin/sh << EOF
 mount -t proc proc /proc
 mount -t devtmpfs dev /dev
-apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init > /dev/null
+apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
 
-cat >/etc/kernel-hooks.d/secureboot.conf <<EOF1
-cmdline=/etc/kernel/cmdline
-signing_disabled=yes
-output_dir="/boot/EFI/Linux"
-output_name="alpine-linux-{flavor}.efi"
-EOF1
-
-cat >/etc/kernel/cmdline <<EOF2
+# Declare cmdline before secureboot, so detection is correct.
+mkdir /etc/kernel
+cat >/etc/kernel/cmdline <<EOF1
 root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2)
 rootflags=subvol=@
 rootfstype=btrfs
 modules=sd-mod,btrfs,nvme
 quiet
 ro
+EOF1
+
+cat >/etc/kernel-hooks.d/secureboot.conf <<EOF2
+cmdline=/etc/kernel/cmdline
+signing_disabled=yes
+output_dir="/boot/EFI/Linux"
+output_name="alpine-linux-{flavor}.efi"
 EOF2
 
 echo ">>> Updating hooks and initramfs"
