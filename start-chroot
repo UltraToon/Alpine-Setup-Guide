@@ -2,16 +2,6 @@
 
 # THIS IS NOT MINE
 
-if [ 0 -ne `id -u` ]; then
-  echo "This script needs root access" >&2
-  exit 1
-fi
-
-if ! [ -d "$1" ] || [ x-h = x"$*" ] || [ x--help = x"$*" ]; then
-  echo "Usage: ${0##*/} <chroot_directory>" >&2
-  exit 1
-fi
-
 cd "$1"
 if ! [ -d ./etc ]; then
   echo "No etc directory inside $1" >&2
@@ -56,9 +46,7 @@ umount_all() {
 }
 trap 'umount_all' EXIT
 
-#mkdir -p ./etc ./dev/pts ./sys ./proc ./tmp ./run ./boot ./root
-
-cp -iL /etc/resolv.conf ./etc/ || true  # if ^C, will cancel script
+cp -ifL /etc/resolv.conf ./etc/
 
 mount --bind /dev ./dev
 MOUNTED="dev $MOUNTED"
@@ -91,7 +79,3 @@ case $1 in
 esac
 chroot . /usr/bin/env -i SHELL=/bin/sh HOME=/root TERM="$TERM" \
   PATH=/usr/sbin:/usr/bin:/sbin:/bin PS1='chroot # ' /bin/sh -l "$@"
-
-# FIXME
-# are USER and LOGNAME set automatically?
-# perhaps: source /etc/profile && export PS1="chroot $PS1"
