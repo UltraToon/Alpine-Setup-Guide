@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-# THIS IS NOT MINE
+# Edited version of alpine chroot script
 
 cd "$1"
 if ! [ -d ./etc ]; then
