@@ -29,10 +29,10 @@ read -r DISK
 # Partitioning
 parted --script -a optimal "$DISK" \
     mklabel gpt \
-    mkpart primary fat32 0% 200MiB \
+    mkpart primary fat32 0% 300MiB \
     name 1 esp \
     set 1 esp on \
-    mkpart primary btrfs 200MiB 100% \
+    mkpart primary btrfs 300MiB 100% \
     name 2 root
 
 partprobe "$DISK"
@@ -72,10 +72,11 @@ echo ">>> [Phase 2] System installed, setting up UKI and ZRAM..."
 echo "============================================================"
 
 chroot $MOUNTPOINT /bin/sh << EOF
+
 mount -t proc proc /proc
 mount -t devtmpfs dev /dev
-apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
 
+# Run secureboot.conf setup before APK due to secureboot-hook running instantly.
 mkdir /etc/kernel
 cat >/etc/kernel-hooks.d/secureboot.conf <<EOF1
 cmdline="root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2) rootflags=subvol=@ rootfstype=btrfs modules=sd-mod,btrfs,nvme quiet ro"
@@ -83,6 +84,8 @@ signing_disabled=yes
 output_dir="/boot/EFI/Linux"
 output_name="alpine-linux-{flavor}.efi"
 EOF1
+
+apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
 
 echo ">>> Updating hooks and initramfs"
 apk fix kernel-hooks
@@ -104,8 +107,11 @@ maxs0=1 # maximum number of parallel processes for this device
 algo0=lzo-rle # zstd (since linux-4.18), lz4 (since linux-3.15), or lzo.
 labl0=zram_swap # the label name
 EOF2
+
 EOF
 
-echo "####################################"
-echo ">>> Script completed, please reboot."
-echo "####################################"
+echo ""
+echo " ########################################"
+echo " # >>> Script completed, please reboot. #"
+echo " ########################################"
+echo ""
