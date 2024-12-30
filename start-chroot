@@ -46,7 +46,7 @@ umount_all() {
 }
 trap 'umount_all' EXIT
 
-cp -ifL /etc/resolv.conf ./etc/
+cp -fL /etc/resolv.conf ./etc/
 
 mount --bind /dev ./dev
 MOUNTED="dev $MOUNTED"
