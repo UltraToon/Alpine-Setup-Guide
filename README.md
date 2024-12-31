@@ -3,6 +3,8 @@ DWL
 Distrobox setup [flatpak too]  
 Zellij with foot/ghostty  
 
+I dont really plan this for public use, just for personal.
+
 **BTRFS has asychronous discard (trim) default on kernel 6.2, use FITRIM periodic with chrontab for XFS SSD**
 
 ONLY SUPPORTS INTEL CPU, GPT, SCSI/NVME SETUPS.
