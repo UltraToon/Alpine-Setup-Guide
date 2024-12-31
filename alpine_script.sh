@@ -1,5 +1,6 @@
 #!/bin/sh
-set -e
+# shellcheck disable=SC3040
+set -euo pipefail
 
 echo "Did you ^C out of the disk prompt in setup-alpine? If not, please reboot the medium. (yes/no)"
 read -r response
@@ -13,8 +14,6 @@ clear
 echo "================================================================="
 echo ">>> [Phase 1] Setting up partitions, btrfs, and system install..."
 echo "================================================================="
-sed -i 's|alpine/[^/]\+|alpine/edge|g' "/etc/apk/repositories"
-apk update -q
 apk add -q parted btrfs-progs dosfstools zstd
 umount "$MOUNTPOINT" 2>/dev/null || true
 modprobe btrfs
@@ -64,36 +63,55 @@ mount "$BTRFS_PAR" -o subvol=@var_log,$BTRFS_OPTS "$MOUNTPOINT/var/log"
 mount "$BTRFS_PAR" -o subvol=@snapshots,$BTRFS_OPTS  "$MOUNTPOINT/.snapshots"
 mount "$ESP_PAR" -t vfat  /mnt/boot
 
-BOOTLOADER=none setup-disk -k edge -m sys /mnt
+BOOTLOADER=none setup-disk -m sys /mnt
 
 clear
-echo "============================================================"
-echo ">>> [Phase 2] System installed, setting up UKI and ZRAM..."
-echo "============================================================"
+echo "============================================================================="
+echo ">>> [Phase 2] Chrooting to setup auto UKI [hook+image], ZRAM, and graphics..."
+echo "============================================================================="
 
-chroot $MOUNTPOINT /bin/sh << EOF
+wget -qO /root/start-chroot https://raw.githubusercontent.com/UltraToon/Alpine-Setup-Guide/refs/heads/main/start-chroot && chmod +x /root/start-chroot
 
-mount -t proc proc /proc
-mount -t devtmpfs dev /dev
+/root/start-chroot /mnt << EOF
 
-# Run secureboot.conf setup before APK due to secureboot-hook running instantly.
-mkdir -p /etc/kernel /etc/kernel-hooks.d
-cat >/etc/kernel-hooks.d/secureboot.conf <<EOF1
-cmdline="root=UUID=$(blkid "$BTRFS_PAR" | cut -d '"' -f 2) rootflags=subvol=@ rootfstype=btrfs modules=sd-mod,btrfs,nvme quiet ro"
-signing_disabled=yes
-output_dir="/boot/EFI/Linux"
-output_name="alpine-linux-{flavor}.efi"
-EOF1
+echo ">>> Updating APK repositories..."
+sed -i 's|alpine/[^/]\+|alpine/edge|g' "/etc/apk/repositories"
+apk update -q
+apk add -q binutils gummiboot-efistub efibootmgr zram-init intel-ucode kernel-hooks
 
-apk add -q secureboot-hook gummiboot-efistub efibootmgr zram-init
-
-echo ">>> Updating hooks and initramfs"
-apk fix kernel-hooks
+echo ">>> Creating kernel hooks [UKI generation]"
+cat >/etc/kernel-hooks.d/50-updateUKI.hook <<EOF1
+if [ $# -lt 2 ]; then
+    echo ">>ERROR DETECTED" >&2 # TEMPORARY
+    exit 1
+fi
+readonly FLAVOR=$1
+readonly NEW_VERSION=$2
+output_name = "alpine-$NEW_VERSION-$FLAVOR.efi"
+[ "$NEW_VERSION" ] || exit 0
+">>> Backing up"
+rm -rf /boot/EFI/*.bak
+cp -af "/boot/EFI/$output_name" "/boot/EFI$output_name.bak" # Ignore shellcheck problem
+echo ">>> Creating unified initramfs...
 sed -i 's/features="\(.*\)"/features="\1 kms"/' /etc/mkinitfs/mkinitfs.conf
 echo 'disable_trigger=yes' >> /etc/mkinitfs/mkinitfs.conf
-
-echo ">>> Creating boot entry"
-efibootmgr --disk "$DISK" --part 1 --create --label 'Alpine Linux' --load /EFI/Linux/alpine-linux-edge.efi --verbose
+tmpdir=$(mktemp -dt "updateUKI.XXXXXX")
+trap "rm -f '$tmpdir'/*; rmdir '$tmpdir'" EXIT HUP INT TERM # ignore shellcheck problem
+/sbin/mkinitfs -o "$tmpdir"/initramfs "$NEW_VERSION-$FLAVOR"
+cat /boot/intel-ucode.img $tmpdir/initramfs > $tmpdir/initramfs
+echo ">>> Creating UKI...
+objcopy \
+	--add-section .osrel="/etc/os-release" --change-section-vma .osrel=0x20000 \
+	--add-section .cmdline="root=UUID=$(blkid | grep btrfs | awk -F '"' '{print $2}') rootflags=subvol=@ rootfstype=btrfs zswap.enabled=0 modules=sd-mod,btrfs,nvme quiet ro" --change-section-vma .cmdline=0x30000 \
+	--add-section .linux="/boot/vmlinuz-$FLAVOR" --change-section-vma .linux=0x40000 \
+	--add-section .initrd="$tmpdir/initramfs --change-section-vma .initrd=0x3000000 \
+	"/usr/lib/gummiboot/linuxx64.efi.stub" "/boot/EFI/$output_name"
+echo ">>> Creating EFI boot entry..."
+efibootmgr --disk "$(busybox fdisk -l | grep "^Disk /dev" | cut -d' ' -f2 | tr -d ':')" --part 1 --create --label 'Alpine Linux ($FLAVOR)' --load /EFI/$output_name --verbose
+EOF1
+apk fix kernel-hooks
+apk add linux-edge
+apk del linux-lts
 
 echo ">>> Setting up zram"
 rc-update add zram-init
@@ -108,6 +126,8 @@ algo0=lzo-rle # zstd (since linux-4.18), lz4 (since linux-3.15), or lzo.
 labl0=zram_swap # the label name
 EOF2
 
+echo ">>> Setting up AMD graphics"
+
 EOF
 
 echo ""
@@ -115,3 +135,23 @@ echo " ########################################"
 echo " # >>> Script completed, please reboot. #"
 echo " ########################################"
 echo ""
+
+
+# Experimental aligned partitions, I dont understand and this isnt required as of now.
+
+#align="$(objdump -p /usr/lib/gummiboot/linuxx64.efi.stub | awk '{ if ($1 == "SectionAlignment"){print $2} }')"
+#align="$(echo "ibase=16; $1" | bc)"
+#osrel_offs="$(objdump -h "/usr/lib/gummiboot/linuxx64.efi.stub" | awk 'NF==7 {size=strtonum("0x"$3); offset=strtonum("0x"$4)} END {print size + offset}')"
+#osrel_offs=$((osrel_offs + "$align" - osrel_offs % "$align"))
+#cmdline_offs=$((osrel_offs + $(stat -Lc%s "/usr/lib/os-release")))
+#cmdline_offs=$((cmdline_offs + "$align" - cmdline_offs % "$align"))
+#initrd_offs=$((initrd_offs + "$align" - initrd_offs % "$align"))
+#linux_offs=$((initrd_offs + $(stat -Lc%s "initrd-file")))
+#linux_offs=$((linux_offs + "$align" - linux_offs % "$align"))
+#
+#objcopy \
+#	--add-section .osrel="/usr/lib/os-release" --change-section-vma .osrel=$(printf 0x%x "$osrel_offs") \
+#	--add-section .cmdline="/etc/kernel/cmdline" --change-section-vma .cmdline=$(printf 0x%x "$cmdline_offs") \
+#	--add-section .linux="/boot/vmlinuz-edge" --change-section-vma .linux=$(printf 0x%x "$linux_offs") \
+#	--add-section .initrd="/tmp/initramfs-edge" --change-section-vma .initrd=$(printf 0x%x "$initrd_offs") \
+#	/usr/lib/gummiboot/linuxx64.efi.stub /boot/EFI/alpine.efi
