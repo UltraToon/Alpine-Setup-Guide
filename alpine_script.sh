@@ -105,9 +105,12 @@ umount_all() {
   dev\ *) umount ./dev
           MOUNTED=${MOUNTED#dev };;
   esac
+
+  echo ">>> Unmounted chroot directories, finalizing..."
 }
 trap 'umount_all' EXIT
 
+mkdir -p ./etc ./dev/pts ./sys ./proc ./tmp ./run ./boot ./root
 cp -fL /etc/resolv.conf ./etc/
 
 mount --bind /dev ./dev
