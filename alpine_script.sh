@@ -61,18 +61,82 @@ mkdir -p "$MOUNTPOINT/home" "$MOUNTPOINT/var/log" "$MOUNTPOINT/.snapshots" "$MOU
 mount "$BTRFS_PAR" -o subvol=@home,$BTRFS_OPTS  "$MOUNTPOINT/home"
 mount "$BTRFS_PAR" -o subvol=@var_log,$BTRFS_OPTS "$MOUNTPOINT/var/log"
 mount "$BTRFS_PAR" -o subvol=@snapshots,$BTRFS_OPTS  "$MOUNTPOINT/.snapshots"
-mount "$ESP_PAR" -t vfat  /mnt/boot
+mount "$ESP_PAR" -t vfat  $MOUNTPOINT/boot
 
-BOOTLOADER=none setup-disk -m sys /mnt
+BOOTLOADER=none setup-disk -m sys $MOUNTPOINT
 
 clear
 echo "============================================================================="
 echo ">>> [Phase 2] Chrooting to setup auto UKI [hook+image], ZRAM, and graphics..."
 echo "============================================================================="
 
-wget -qO /root/start-chroot https://raw.githubusercontent.com/UltraToon/Alpine-Setup-Guide/refs/heads/main/start-chroot && chmod +x /root/start-chroot
+# Modified alpine chroot
+MOUNTED=
+umount_all() {
+  case $MOUNTED in
+  shm\ *) if [ -L ./dev/shm ]; then
+            umount ./"$(readlink ./dev/shm)"
+          else
+            umount ./dev/shm
+          fi
+          MOUNTED=${MOUNTED#shm };;
+  esac
+  case $MOUNTED in
+  run\ *) umount ./run
+          MOUNTED=${MOUNTED#run };;
+  esac
+  case $MOUNTED in
+  tmp\ *) umount ./tmp
+          MOUNTED=${MOUNTED#tmp };;
+  esac
+  case $MOUNTED in
+  proc\ *) umount ./proc
+          MOUNTED=${MOUNTED#proc };;
+  esac
+  case $MOUNTED in
+  sys\ *) umount ./sys
+          MOUNTED=${MOUNTED#sys };;
+  esac
+  case $MOUNTED in
+  pts\ *) umount ./dev/pts
+          MOUNTED=${MOUNTED#pts };;
+  esac
+  case $MOUNTED in
+  dev\ *) umount ./dev
+          MOUNTED=${MOUNTED#dev };;
+  esac
+}
+trap 'umount_all' EXIT
 
-/root/start-chroot /mnt << EOF
+cp -fL /etc/resolv.conf ./etc/
+
+mount --bind /dev ./dev
+MOUNTED="dev $MOUNTED"
+
+mount -t devpts devpts ./dev/pts -o nosuid,noexec
+MOUNTED="pts $MOUNTED"
+
+mount -t sysfs sys ./sys -o nosuid,nodev,noexec,ro
+MOUNTED="sys $MOUNTED"
+
+mount -t proc proc ./proc -o nosuid,nodev,noexec
+MOUNTED="proc $MOUNTED"
+
+mount -t tmpfs tmp ./tmp -o mode=1777,nosuid,nodev,strictatime
+MOUNTED="tmp $MOUNTED"
+mount -t tmpfs run ./run -o mode=0755,nosuid,nodev
+MOUNTED="run $MOUNTED"
+if [ -L ./dev/shm ]; then
+  mkdir -p ./"$(readlink ./dev/shm)"
+  mount -t tmpfs shm ./"$(readlink ./dev/shm)" -o mode=1777,nosuid,nodev
+else
+  #mkdir -p ./dev/shm
+  mount -t tmpfs shm ./dev/shm -o mode=1777,nosuid,nodev
+fi
+MOUNTED="shm $MOUNTED"
+
+chroot $MOUNTPOINT /usr/bin/env -i SHELL=/bin/sh HOME=/root TERM="$TERM" \
+  PATH=/usr/sbin:/usr/bin:/sbin:/bin /bin/sh << EOF
 
 echo ">>> Updating APK repositories..."
 sed -i 's|alpine/[^/]\+|alpine/edge|g' "/etc/apk/repositories"
@@ -87,11 +151,13 @@ if [ $# -lt 2 ]; then
 fi
 readonly FLAVOR=$1
 readonly NEW_VERSION=$2
-output_name = "alpine-$NEW_VERSION-$FLAVOR.efi"
+output_name="alpine-$NEW_VERSION-$FLAVOR.efi"
 [ "$NEW_VERSION" ] || exit 0
+
 ">>> Backing up"
 rm -rf /boot/EFI/*.bak
 cp -af "/boot/EFI/$output_name" "/boot/EFI$output_name.bak" # Ignore shellcheck problem
+
 echo ">>> Creating unified initramfs...
 sed -i 's/features="\(.*\)"/features="\1 kms"/' /etc/mkinitfs/mkinitfs.conf
 echo 'disable_trigger=yes' >> /etc/mkinitfs/mkinitfs.conf
@@ -99,6 +165,7 @@ tmpdir=$(mktemp -dt "updateUKI.XXXXXX")
 trap "rm -f '$tmpdir'/*; rmdir '$tmpdir'" EXIT HUP INT TERM # ignore shellcheck problem
 /sbin/mkinitfs -o "$tmpdir"/initramfs "$NEW_VERSION-$FLAVOR"
 cat /boot/intel-ucode.img $tmpdir/initramfs > $tmpdir/initramfs
+
 echo ">>> Creating UKI...
 objcopy \
 	--add-section .osrel="/etc/os-release" --change-section-vma .osrel=0x20000 \
@@ -106,9 +173,11 @@ objcopy \
 	--add-section .linux="/boot/vmlinuz-$FLAVOR" --change-section-vma .linux=0x40000 \
 	--add-section .initrd="$tmpdir/initramfs --change-section-vma .initrd=0x3000000 \
 	"/usr/lib/gummiboot/linuxx64.efi.stub" "/boot/EFI/$output_name"
+
 echo ">>> Creating EFI boot entry..."
 efibootmgr --disk "$(busybox fdisk -l | grep "^Disk /dev" | cut -d' ' -f2 | tr -d ':')" --part 1 --create --label 'Alpine Linux ($FLAVOR)' --load /EFI/$output_name --verbose
 EOF1
+
 apk fix kernel-hooks
 apk add linux-edge
 apk del linux-lts
