@@ -14,6 +14,9 @@ https://it-notes.dragas.net/2021/11/03/alpine-linux-and-lxd-perfect-setup-part-1
 https://wiki.alpinelinux.org/wiki/Installation  
 https://wiki.alpinelinux.org/wiki/Zram  
 
+
+Sooo I dont know what I am doing, theres literally no point for this, i just wasted a week on this. Bruh.
+
 # Install Process
 1. Run `setup-alpine`
    - When prompted for APK repo, make sure to **enable community repos** then **find fastest mirror** (C+F)
