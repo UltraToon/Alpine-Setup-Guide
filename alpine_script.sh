@@ -1,6 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC3040
-set -euo pipefail
+set -eo pipefail
 
 echo "Did you ^C out of the disk prompt in setup-alpine? If not, please reboot the medium. (yes/no)"
 read -r response
@@ -138,20 +138,16 @@ else
 fi
 MOUNTED="shm $MOUNTED"
 
-chroot $MOUNTPOINT /usr/bin/env -i SHELL=/bin/sh HOME=/root TERM="$TERM" \
-  PATH=/usr/sbin:/usr/bin:/sbin:/bin /bin/sh << EOF
+chroot $MOUNTPOINT /usr/bin/env -i SHELL=/bin/sh HOME=/root TERM="$TERM" PATH=/usr/sbin:/usr/bin:/sbin:/bin /bin/sh << EOF
 
 echo ">>> Updating APK repositories..."
 sed -i 's|alpine/[^/]\+|alpine/edge|g' "/etc/apk/repositories"
 apk update -q
+echo ">>>
 apk add -q binutils gummiboot-efistub efibootmgr zram-init intel-ucode kernel-hooks
 
 echo ">>> Creating kernel hooks [UKI generation]"
 cat >/etc/kernel-hooks.d/50-updateUKI.hook <<EOF1
-if [ $# -lt 2 ]; then
-    echo ">>ERROR DETECTED" >&2 # TEMPORARY
-    exit 1
-fi
 readonly FLAVOR=$1
 readonly NEW_VERSION=$2
 output_name="alpine-$NEW_VERSION-$FLAVOR.efi"
